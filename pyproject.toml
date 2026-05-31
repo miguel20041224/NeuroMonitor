@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "neuromonitor"
+version = "0.2.0"
+description = "Aplicación de escritorio para monitoreo en tiempo real de CPU, GPU, RAM y disco"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "psutil>=6.0.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+]
+
+[project.optional-dependencies]
+gpu = ["pynvml>=11.5.0"]
+desktop = ["pywebview>=5.0.0"]
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+]
+
+[project.scripts]
+neuromonitor = "neuromonitor.cli:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["neuromonitor"]
+
+[tool.hatch.build.targets.sdist]
+include = ["neuromonitor"]

@@ -1,0 +1,193 @@
+================================================================================
+  NEUROMONITOR — ANÁLISIS DE EXPOSICIÓN API Y RED
+================================================================================
+
+Revisión: 2026-05-31 — código neuromonitor/ (paquete wheel) + src/ (divergente)
+
+================================================================================
+1. INVENTARIO DE ENDPOINTS (paquete neuromonitor/)
+================================================================================
+
+  Método | Ruta               | Auth | Input | Output              | Estado
+  -------|--------------------| -----|-------|---------------------|--------
+  GET    | /health            | NO   | —     | status, version     | ACTIVO*
+  GET    | /metrics/snapshot  | NO   | —     | SystemSnapshot      | ACTIVO*
+  WS     | /ws/metrics        | NO   | WS    | stream snapshots    | DESHABILITADO
+  GET    | /docs              | NO   | —     | Swagger UI          | ACTIVO*
+  GET    | /redoc             | NO   | —     | ReDoc               | ACTIVO*
+  GET    | /openapi.json      | NO   | —     | OpenAPI schema      | ACTIVO*
+
+  * Solo si enable_api=true Y run_api_server() exitoso
+
+Arranque:
+  python main.py --api --enable-api
+  NEUROMONITOR_ENABLE_API=true neuromonitor-api --enable-api
+
+================================================================================
+2. INVENTARIO ENDPOINTS (src/neuromonitor/ — NO USAR EN PRODUCCIÓN)
+================================================================================
+
+  Diferencias críticas vs paquete:
+    + CORSMiddleware con settings.cors_origins (campo INEXISTENTE → crash)
+    + include_router(ws_router) → WS /ws/metrics ACTIVO
+    + stream_snapshots() no implementado → AttributeError al conectar
+
+  Ver SEC-025, SEC-021
+
+================================================================================
+3. CONFIGURACIÓN DE RED (ESTADO ACTUAL)
+================================================================================
+
+  Parámetro                | Estado              | Default    | Riesgo
+  -------------------------|---------------------|------------|--------
+  NEUROMONITOR_ENABLE_API  | IMPLEMENTADO        | false      | MITIGADO
+  NEUROMONITOR_HOST        | IMPLEMENTADO        | 127.0.0.1  | MITIGADO
+  NEUROMONITOR_PORT        | IMPLEMENTADO        | 8765       | OK
+  NEUROMONITOR_ALLOW_REMOTE| IMPLEMENTADO        | false      | MITIGADO
+  NEUROMONITOR_API_TOKEN   | NO EXISTE           | —          | ALTO
+  TLS/HTTPS                | NO IMPLEMENTADO     | —          | ALTO*
+  CORS (paquete)           | NO CONFIGURADO      | deny       | OK
+  CORS (src/)              | ROTO                | crash      | ALTO
+
+  * ALTO solo si ALLOW_REMOTE=true sin reverse proxy TLS
+
+Validación host (settings.py):
+  - 0.0.0.0, ::, [::] → requiere allow_remote=true
+  - Otros hosts → rechazados excepto 127.0.0.1 / localhost normalizado
+
+================================================================================
+4. ANÁLISIS POR ENDPOINT
+================================================================================
+
+--- GET /health ---
+  Riesgo     : BAJO-MEDIO
+  Datos      : status, service, version
+  Ataque     : Fingerprinting versión (SEC-006)
+  Mitigación : Respuesta mínima sin version para clientes no autenticados
+
+--- GET /metrics/snapshot ---
+  Riesgo     : ALTO (contenido) / MEDIO (localhost-only default)
+  Coste      : ~50ms+ CPU block por cpu_percent(interval=0.05)
+  Datos      : SystemSnapshot completo (hostname, disk topology, GPU, RAM bytes)
+  Ataques    : ESC-01 reconnaissance, ESC-02 DoS flood
+  Mitigación : Auth + rate limit + cache TTL
+
+--- WS /ws/metrics ---
+  Paquete    : NO REGISTRADO (SEC-009 mitigación intencional)
+  src/       : Registrado pero roto (stream_snapshots missing)
+  Mitigación : Implementar broadcaster antes de habilitar en create_app()
+
+================================================================================
+5. ANÁLISIS CORS
+================================================================================
+
+Paquete neuromonitor/api/app.py:
+  - Sin CORSMiddleware → same-origin estricto por defecto
+  - Correcto para API localhost-only
+
+src/neuromonitor/api/app.py:
+  - allow_origins=settings.cors_origins → AttributeError
+  - allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
+  - Riesgo ESC-08 si desarrollador añade cors_origins=["*"]
+
+Regla: Auth token SIEMPRE; CORS no sustituye autenticación.
+
+================================================================================
+6. DEPENDENCIAS RUNTIME API
+================================================================================
+
+  Base (pyproject.toml):
+    psutil, pydantic, pydantic-settings
+
+  Optional [api]:
+    fastapi>=0.115.0
+    uvicorn[standard]>=0.32.0
+
+  Optional [desktop]:
+    pywebview>=5.0.0
+
+  Optional [gpu]:
+    pynvml>=11.5.0
+
+  Gap: sin upper pin; sin httpx para tests contractuales
+
+================================================================================
+7. SINGLETON Y CONCURRENCIA
+================================================================================
+
+  get_monitor_service() → @lru_cache MonitorService()
+
+  Riesgos:
+    - DiskCollector._last_io compartido entre requests concurrentes
+    - NVML init único; uvicorn --workers N → múltiples NVML (crash/leak)
+    - Aceptable solo single-user localhost workers=1
+
+  Recomendación: documentar workers=1; lock file NVML
+
+================================================================================
+8. VALIDACIÓN DE INPUT — "TODO INPUT ES PELIGROSO"
+================================================================================
+
+  Superficie     | Input           | Validación           | Veredicto
+  ---------------|-----------------|----------------------|----------
+  /metrics/snap  | —               | N/A                  | OK (DoS only)
+  /health        | —               | N/A                  | OK
+  update_settings| dict            | Pydantic + allowlist | PARCIAL
+  get_history    | limit: int      | cap 500              | PARCIAL
+  --history-size | int CLI         | min 1, sin max       | INSUFICIENTE
+  --host (api)   | str             | Settings validator   | OK
+  --port         | int             | ge=1 le=65535        | OK
+
+  update_settings allowlist: poll_interval_ms, enable_gpu, app_name
+  Campos sensibles NO expuestos vía RPC: enable_api, host, port, allow_remote
+
+  app_name: str sin max_length → SEC-026
+
+================================================================================
+9. MODO DESKTOP — EXPOSICIÓN DE RED
+================================================================================
+
+  Puerto TCP     : NINGUNO
+  Origen UI      : file://.../assets/index.html
+  Requests salientes: fonts.googleapis.com, fonts.gstatic.com (SEC-020)
+  RPC            : pywebview in-process (no red)
+
+  Riesgo red directo : BAJO
+  Riesgo local       : MEDIO (bridge, evaluate_js, CDN)
+
+================================================================================
+10. SIMULACIÓN INCIDENTE (escenario actualizado)
+================================================================================
+
+  T0: Admin NEUROMONITOR_ENABLE_API=true --host 127.0.0.1
+  T1: Malware local curl loopback:8765/metrics/snapshot
+  T2: Exfiltra mountpoints, GPU, hostname (sin cruzar red)
+  T3: Flood API → DoS estación
+
+  Controles que DETIENEN el incidente hoy:
+    ✓ No exposición LAN accidental (localhost default)
+    ✓ Opt-in explícito API
+
+  Controles AUSENTES:
+    ✗ Auth token
+    ✗ Rate limit
+    ✗ Audit log
+
+================================================================================
+11. CHECKLIST HARDENING RED/API
+================================================================================
+
+  [x] enable_api=false default
+  [x] host=127.0.0.1 default
+  [x] ALLOW_REMOTE gate explícito
+  [x] WS deshabilitado en paquete hasta broadcaster
+  [ ] NEUROMONITOR_API_TOKEN fail-closed
+  [ ] Eliminar src/neuromonitor/api divergente
+  [ ] docs_url=None producción
+  [ ] rate limit /metrics/snapshot
+  [ ] fastapi pin upper bound
+  [ ] uvicorn workers=1 documentado
+
+================================================================================
+  Fin del análisis API y red
+================================================================================

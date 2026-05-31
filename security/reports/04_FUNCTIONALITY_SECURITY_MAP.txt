@@ -1,0 +1,202 @@
+================================================================================
+  NEUROMONITOR — MAPA FUNCIONALIDAD ↔ SEGURIDAD
+================================================================================
+
+Revisión: 2026-05-31 — estados de controles actualizados
+
+================================================================================
+1. CAPTURA CPU
+================================================================================
+Funcionalidad : percent global/per-core, freq, load_avg, cores
+Implementación: neuromonitor/collectors/cpu.py
+
+Datos expuestos : cores, load_avg, percent (side-channel actividad)
+Controles actuales:
+  + clamp_percent() NaN/Inf
+  + degraded → ERR_CPU_DEGRADED (sin str(exception))
+  + Pydantic ge=0 le=100
+Gaps: SEC-015 semántica; SEC-008 cpu_percent bloqueante DoS (mitigación diseñada P1)
+Riesgo: MEDIO
+
+================================================================================
+2. CAPTURA MEMORIA RAM/SWAP
+================================================================================
+Funcionalidad : bytes total/used/available, swap metrics
+Implementación: neuromonitor/collectors/memory.py
+
+Datos expuestos : capacidad RAM exacta, presión memoria realtime
+Controles:
+  + clamp_percent; ERR_MEMORY_DEGRADED
+Gaps: SEC-004 bytes exactos fingerprinting
+Riesgo: MEDIO (ALTO si API remota sin auth)
+
+================================================================================
+3. CAPTURA DISCO
+================================================================================
+Funcionalidad : particiones, I/O Bps
+Implementación: neuromonitor/collectors/disk.py
+
+Datos expuestos (ALTA SENSIBILIDAD):
+  device, mountpoint, fstype, bytes, read/write Bps
+Controles:
+  + PermissionError silenciado (no crash)
+  + disk_partitions(all=False)
+Gaps: SEC-004 topología; SEC-016 sin partitions_skipped
+Riesgo: ALTO (reconnaissance)
+
+================================================================================
+4. CAPTURA GPU
+================================================================================
+Funcionalidad : AMD sysfs, NVIDIA NVML
+Implementación: neuromonitor/collectors/gpu.py
+
+Datos expuestos : model name, VRAM, util, temperature
+Controles:
+  + enable_gpu flag; nvmlShutdown
+  + fallback degradado
+Gaps: SEC-017 hot-reload; SEC-005 message verbose degraded
+Riesgo: MEDIO
+
+================================================================================
+5. SNAPSHOT UNIFICADO (SystemSnapshot)
+================================================================================
+Funcionalidad : timestamp + hostname + cpu + memory + disk + gpu
+Implementación: models/snapshot.py, monitor_service.py
+
+Controles:
+  + Pydantic validation; model_dump(mode="json")
+Gaps: SEC-013 sin firma; SEC-004 hostname; SEC-001 sin auth en salida API
+Riesgo: ALTO
+
+================================================================================
+6. MOTOR POLLING (NeuroMonitorApplication)
+================================================================================
+Funcionalidad : poll loop, MetricsHub pub/sub
+Implementación: application/app.py, events.py
+
+Controles:
+  + stop_event shutdown; daemon thread; exception log poll loop
+Gaps: SEC-011 min interval 100ms; SEC-027 subscriber exceptions no aisladas
+Riesgo: BAJO-MEDIO
+
+================================================================================
+7. BUFFER HISTORIAL (HistoryBuffer)
+================================================================================
+Funcionalidad : deque thread-safe max_size
+Implementación: services/history_buffer.py
+
+Controles:
+  + Lock; max_size >= 1
+Gaps: SEC-010 CLI --history-size sin max; bridge cap 500 [PARCIAL]
+Riesgo: MEDIO
+
+================================================================================
+8. BRIDGE pywebview (RPC)
+================================================================================
+Funcionalidad : get_current_snapshot, get_history, update_settings
+Implementación: bridge/pywebview_bridge.py
+
+Controles:
+  + _SETTINGS_ALLOWLIST (poll_interval_ms, enable_gpu, app_name)
+  + Pydantic validate merged Settings
+  + get_history cap 500
+  + errores genéricos ERR_INVALID_SETTINGS
+Gaps: SEC-002 sin ACL; SEC-026 app_name; SEC-017 enable_gpu
+Riesgo: MEDIO (ALTO con XSS)
+
+================================================================================
+9. STREAMING UI (evaluate_js + onNewSnapshot)
+================================================================================
+Funcionalidad : push realtime a React
+Implementación: desktop.py, useMetricsBridge.tsx
+
+Controles:
+  + json.dumps serialización
+  + webview.start(debug=False)
+Gaps: SEC-018 evaluate_js; SEC-019 global callback; SEC-020 sin CSP
+Riesgo: MEDIO
+
+================================================================================
+10. API REST FastAPI (paquete neuromonitor/)
+================================================================================
+Funcionalidad : GET /health, GET /metrics/snapshot
+Implementación: api/routes/*, api/server.py
+
+Controles:
+  + enable_api=false default [NUEVO]
+  + localhost bind enforced [NUEVO]
+  + Pydantic response_model
+  + Sin CORS (deny default) [NUEVO]
+  + X-API-Token en GET /metrics/snapshot (require_api_token) [PARCIAL SEC-001]
+  + Rate limit 2 req/s (IP+token) — DISEÑO P1-03 [07_SEC-008 spec]
+Gaps: SEC-001 fail-closed token en arranque; SEC-003 OpenAPI; SEC-008 sin impl. código
+Riesgo: ALTO si habilitada sin P1 completo; SEC-008 DoS persiste hasta merge guard
+
+Estado: Opt-in; integrada en main.py --api
+
+================================================================================
+11. API WEBSOCKET
+================================================================================
+Paquete neuromonitor/ : DESHABILITADO intencionalmente (SEC-009)
+src/neuromonitor/     : ACTIVO pero roto (stream_snapshots missing)
+
+Riesgo paquete: BAJO (no expuesto)
+Riesgo src/   : ALTO (latente)
+Recomendación : No habilitar WS hasta P1-04
+
+================================================================================
+12. MODO CLI
+================================================================================
+Funcionalidad : summary/json stdout, --once
+Gaps: SEC-007 JSON completo en pipes/logs
+Riesgo: BAJO
+
+================================================================================
+13. CONFIGURACIÓN (Settings)
+================================================================================
+Campos seguridad-relevantes:
+  enable_api: bool = False          [MITIGADO]
+  allow_remote: bool = False        [MITIGADO]
+  host: 127.0.0.1 enforced          [MITIGADO]
+  port: 8765
+  poll_interval_ms: [100, 60000]
+  enable_gpu, app_name
+
+Ausentes: api_token, disclosure_level, cors_origins, max_ws_clients
+Gap: .env legible por otros usuarios OS (permisos file)
+Riesgo: MEDIO (config futura)
+
+================================================================================
+14. ÁRBOL CÓDIGO DUPLICADO (src/neuromonitor/)
+================================================================================
+Funcionalidad : copia dev legacy de backend + frontend
+Riesgo: ALTO — SEC-025
+Controles: ninguno
+Recomendación: eliminar o CI check sync
+
+================================================================================
+TABLA RESUMEN
+================================================================================
+
+  #  | Funcionalidad       | Riesgo | Auth | Controles nuevos
+  ---|---------------------|--------|------|------------------
+  1  | CPU collector       | MEDIO  | N/A  | ERR_* degraded
+  2  | Memory collector    | MEDIO  | N/A  | ERR_* degraded
+  3  | Disk collector      | ALTO   | N/A  | —
+  4  | GPU collector       | MEDIO  | N/A  | —
+  5  | SystemSnapshot      | ALTO   | NO   | —
+  6  | Poll engine         | B-M    | N/A  | —
+  7  | HistoryBuffer       | MEDIO  | NO   | bridge cap 500
+  8  | pywebview bridge    | MEDIO  | NO   | allowlist, cap, errors
+  9  | evaluate_js stream  | MEDIO  | N/A  | —
+  10 | REST API            | ALTO*  | NO   | enable_api, localhost
+  11 | WebSocket API       | VAR    | NO   | off en paquete
+  12 | CLI                 | BAJO   | N/A  | —
+  13 | Settings            | MEDIO  | N/A  | enable_api, host, allow_remote
+  14 | src/ duplicado      | ALTO   | N/A  | —
+
+  * ALTO solo con enable_api=true
+
+================================================================================
+  Fin del mapa funcionalidad-seguridad
+================================================================================

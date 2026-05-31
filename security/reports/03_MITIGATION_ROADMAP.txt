@@ -1,0 +1,183 @@
+================================================================================
+  NEUROMONITOR — HOJA DE RUTA DE MITIGACIÓN
+================================================================================
+
+Prioridad: P0 (bloqueante) > P1 (antes de exposición red) > P2 (hardening) > P3
+Revisión : 2026-05-31 — estados actualizados vs código actual
+
+Leyenda: [HECHO] implementado | [PARCIAL] incompleto | [PENDIENTE] no iniciado
+
+================================================================================
+FASE 0 — CONTENCIÓN INMEDIATA
+================================================================================
+
+[P0-01] Deshabilitar exposición API por defecto                    [HECHO]
+  Evidencia: settings.enable_api=False; server.py fail-closed
+  Cierra   : SEC-001 (parcial operacional)
+
+[P0-02] Bind localhost-only                                      [HECHO]
+  Evidencia: settings.host validator + allow_remote gate
+  Cierra   : SEC-001 LAN, ESC-01 (parcial)
+
+[P0-03] Unificar código API (eliminar divergencia src/)          [PENDIENTE]
+  Acción:
+    - Eliminar src/neuromonitor/api/ o sync automático con neuromonitor/
+    - Si CORS necesario: cors_origins: list[str] = Field(default_factory=list)
+    - NUNCA allow_origins=["*"] + allow_credentials=True
+  Archivos: src/neuromonitor/api/app.py (eliminar), neuromonitor/api/app.py
+  Verifica : LAB_03 TC-API-001 PASS; un solo create_app()
+  Cierra   : SEC-021, SEC-025, ESC-08, ESC-12
+
+================================================================================
+FASE 1 — AUTENTICACIÓN Y AUTORIZACIÓN
+================================================================================
+
+[P1-01] Token estático API                                       [PENDIENTE]
+  Acción:
+    - NEUROMONITOR_API_TOKEN requerido si enable_api=true (fail-closed)
+    - Header Authorization: Bearer <token> en REST
+    - WS: ?token= o Sec-WebSocket-Protocol
+  Archivos: api/deps.py, api/middleware/auth.py (nuevo)
+  Cierra   : SEC-001, ESC-01, ESC-02, ESC-08
+
+[P1-02] Restringir OpenAPI en producción                         [PENDIENTE]
+  Acción: docs_url=None, redoc_url=None cuando not debug
+  Archivos: neuromonitor/api/app.py
+  Cierra   : SEC-003
+
+[P1-03] Rate limiting REST                                       [DISEÑO — P1]
+  Estado   : Mitigación en Diseño (P1) — spec 07_SEC-008_RATE_LIMITING_SPEC.txt
+  Acción:
+    - Guard en metrics.py: 2 req/s por clave (IP origen + X-API-Token)
+    - RateLimitStore in-memory: ring timestamps fijo + LRU max_keys (anti DoS tracker)
+    - HTTP 429 opaco: {success:false, code:ERR_RATE_LIMITED, error:Demasiadas peticiones}
+    - Complemento REC-029: cache snapshot TTL = poll_interval_ms (misma entrega)
+  Archivos: api/routes/metrics.py, api/rate_limit.py (nuevo), settings.py
+  Verifica : ACC-008-01…08; LAB_SEC_008; LAB_09 TC-QA-100/103
+  Cierra   : SEC-008, ESC-02 (parcial hasta MITIGADO en código)
+
+================================================================================
+FASE 2 — ARQUITECTURA API RESILIENTE
+================================================================================
+
+[P1-04] Pub/sub único WebSocket                                  [PENDIENTE]
+  Acción:
+    - MonitorService.stream_snapshots() async broadcaster
+    - max_ws_clients en Settings (default 5)
+    - Solo registrar WS tras implementación completa
+  Archivos: monitor_service.py, api/websocket/stream.py
+  Cierra   : SEC-009, ESC-03
+  Nota     : Paquete actual NO expone WS — mantener hasta P1-04 completo
+
+[P1-05] Backpressure WebSocket                                   [PENDIENTE]
+  Acción: timeout send_text; desconectar slow consumers; log 1011
+  Cierra   : SEC-012, SEC-024
+
+[P1-06] Dependencias API pinneadas                                [PARCIAL]
+  Hecho    : optional-dependencies api en pyproject.toml
+  Pendiente: upper bounds; script entrypoint neuromonitor-api
+  Cierra   : SEC-022
+
+================================================================================
+FASE 3 — HARDENING DESKTOP / BRIDGE
+================================================================================
+
+[P1-07] Límites RPC pywebview                                    [PARCIAL]
+  Hecho    : get_history cap 500 (_MAX_HISTORY_LIMIT)
+  Pendiente:
+    - Cap --history-size en desktop.py (p.ej. max 2000)
+    - Validar app_name: max 64 chars, regex printable
+  Archivos: pywebview_bridge.py, desktop.py, settings.py
+  Cierra   : SEC-010, SEC-026, ESC-04, ESC-13
+
+[P1-08] Propagar enable_gpu a GpuCollector                       [PENDIENTE]
+  Acción: MonitorService.set_gpu_enabled() o recrear collector
+  Cierra   : SEC-017
+
+[P1-09] Reemplazar evaluate_js                                   [PENDIENTE]
+  Acción: pywebview events/queue; EventTarget encapsulado en frontend
+  Cierra   : SEC-018, SEC-019, ESC-05
+
+[P1-10] poll_interval_ms mínimo conservador                      [PENDIENTE]
+  Acción: ge=100 → ge=500 o ge=1000
+  Cierra   : SEC-011, ESC-04
+
+================================================================================
+FASE 4 — REDUCCIÓN FILTRACIÓN DE INFORMACIÓN
+================================================================================
+
+[P2-01] Modo disclosure configurable                             [PENDIENTE]
+  Acción: disclosure_level: full | redacted | minimal
+  Cierra   : SEC-004, ESC-01, ESC-11
+
+[P2-02] Sanitizar campos message                                 [PARCIAL]
+  Hecho    : ERR_CPU/DISK/MEMORY_DEGRADED; bridge errores genéricos
+  Pendiente: gpu.py message opaco; sin paths en logs INFO
+  Cierra   : SEC-005, ESC-07
+
+[P2-03] partitions_skipped en DiskMetrics                        [PENDIENTE]
+  Cierra   : SEC-016
+
+[P2-04] /health sin versión pública                              [PENDIENTE]
+  Cierra   : SEC-006
+
+================================================================================
+FASE 5 — FRONTEND Y SUPPLY CHAIN
+================================================================================
+
+[P2-05] Content-Security-Policy + fonts locales                  [PENDIENTE]
+  Acción: CSP strict; eliminar fonts.googleapis.com del build
+  Archivos: assets/index.html, vite.config.ts, tokens.css
+  Cierra   : SEC-020, ESC-09
+
+[P2-06] Integridad métricas UI (HMAC opcional)                   [PENDIENTE]
+  Cierra   : SEC-013, ESC-05
+
+[P2-07] Modo demo solo DEV                                       [PARCIAL]
+  Hecho    : import.meta.env.DEV guard en useMetricsBridge.tsx
+  Pendiente: verificar prod bundle sin "demo-host"
+  Cierra   : SEC-014
+
+================================================================================
+FASE 6 — OBSERVABILIDAD DE SEGURIDAD
+================================================================================
+
+[P3-01] Audit log accesos API                                    [PENDIENTE]
+[P3-02] Tests LAB_SEC_* en qa/labs/                              [PENDIENTE]
+[P3-03] Security headers HTTP                                    [PENDIENTE]
+  X-Content-Type-Options, X-Frame-Options, Referrer-Policy
+
+[P3-04] Aislar excepciones MetricsHub per-subscriber             [PENDIENTE]
+  Cierra   : SEC-027
+
+================================================================================
+CRONOGRAMA SUGERIDO (actualizado)
+================================================================================
+
+  Sprint 0 (HECHO)  : P0-01, P0-02, P1-07 parcial, P2-02 parcial, P1-06 parcial
+  Sprint 1 (P0)     : P0-03 eliminar src/ duplicado
+  Sprint 2 (P1 API) : P1-01, P1-02, P1-03
+  Sprint 3 (API WS) : P1-04, P1-05 (solo tras broadcaster)
+  Sprint 4 (Desktop): P1-08, P1-09, P1-10, P1-07 resto
+  Sprint 5 (Privac.) : P2-01 … P2-04
+  Sprint 6 (UI)     : P2-05 … P2-07
+  Backlog           : P3-*
+
+================================================================================
+CHECKLIST PRE-RELEASE (API habilitada)
+================================================================================
+
+  [x] enable_api=false por defecto
+  [x] host=127.0.0.1 enforced
+  [ ] NEUROMONITOR_API_TOKEN definido (≥32 chars)
+  [ ] src/neuromonitor/api/ eliminado o sincronizado
+  [ ] /docs deshabilitado
+  [ ] Rate limit implementado (spec 07 listo; código pendiente)
+  [ ] ACC-008-01…08 PASS en LAB_SEC_008
+  [ ] WS solo con broadcaster único
+  [ ] LAB_03 + LAB_SEC_* PASS
+  [ ] 01_VULNERABILITIES_REGISTER.txt actualizado
+
+================================================================================
+  Fin de hoja de ruta de mitigación
+================================================================================
