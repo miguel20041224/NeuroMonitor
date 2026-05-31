@@ -23,3 +23,7 @@ qa/reports/labs/*.md
 .idea/
 *.swp
 .DS_Store
+security/
+qa/reports/
+.env
+entorno_agentes/
