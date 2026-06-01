@@ -14,6 +14,7 @@ from neuromonitor.bridge.pywebview_bridge import NeuroMonitorBridge
 from neuromonitor.config.settings import Settings, get_settings
 from neuromonitor.models.snapshot import SystemSnapshot
 from neuromonitor.services.history_buffer import HistoryBuffer
+from neuromonitor.telemetry.engine import TelemetryEngine
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,8 @@ def run(argv: list[str] | None = None) -> int:
     settings: Settings = get_settings()
     history_buffer = HistoryBuffer(max_size=args.history_size)
     app_engine = NeuroMonitorApplication(settings=settings)
-    bridge = NeuroMonitorBridge(app_engine, history_buffer)
+    telemetry_engine = TelemetryEngine(run_discovery=True)
+    bridge = NeuroMonitorBridge(app_engine, history_buffer, telemetry=telemetry_engine)
 
     metrics_hub = app_engine.hub
 

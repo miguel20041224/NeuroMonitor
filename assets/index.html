@@ -2,19 +2,1689 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1050, height=750, initial-scale=1.0" />
-    <meta name="theme-color" content="#07080c" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
-      rel="stylesheet"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0d12" />
     <title>NeuroMonitor</title>
-    <script type="module" crossorigin src="./static/index-rObOv18E.js"></script>
-    <link rel="stylesheet" crossorigin href="./static/index-D4CnH8Q7.css">
+    <style>
+      /* ── Design tokens ─────────────────────────────────────────── */
+      :root {
+        --surface: #0a0d12;
+        --surface-raised: #111620;
+        --surface-card: #151b27;
+        --border: #1e2738;
+        --border-subtle: rgba(30, 39, 56, 0.6);
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --text-muted: #64748b;
+        --text-dim: #475569;
+        --emerald: #10b981;
+        --emerald-dim: rgba(16, 185, 129, 0.25);
+        --emerald-glow: rgba(16, 185, 129, 0.35);
+        --cyan: #22d3ee;
+        --cyan-dim: rgba(34, 211, 238, 0.25);
+        --cyan-glow: rgba(34, 211, 238, 0.35);
+        --amber: #fbbf24;
+        --rose: #f43f5e;
+        --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", "SF Mono", Consolas,
+          "Liberation Mono", ui-monospace, monospace;
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 20px;
+        --header-h: 52px;
+        --content-max: 1080px;
+        --transition: 0.15s ease;
+        --transition-fast: 0.08s ease;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--text-primary);
+        background: var(--surface);
+        -webkit-font-smoothing: antialiased;
+        /* Capa compuesta GPU — evita repintado CPU en Qt WebEngine */
+        transform: translate3d(0, 0, 0);
+        will-change: transform, opacity;
+      }
+
+      ::selection {
+        background: rgba(16, 185, 129, 0.3);
+      }
+
+      /* ── Layout shell ──────────────────────────────────────────── */
+      #app {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .container {
+        width: 100%;
+        max-width: var(--content-max);
+        margin: 0 auto;
+        padding: 0 16px;
+      }
+
+      /* ── Header ────────────────────────────────────────────────── */
+      .header {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        height: var(--header-h);
+        border-bottom: 1px solid var(--border);
+        background: rgba(10, 13, 18, 0.92);
+        backdrop-filter: blur(12px);
+      }
+
+      .header__inner {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .brand__icon {
+        flex-shrink: 0;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--emerald-dim);
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(34, 211, 238, 0.08));
+        box-shadow: 0 0 24px -4px var(--emerald-glow);
+        color: var(--emerald);
+      }
+
+      .brand__icon svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .brand__title {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .brand__host {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .header__actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+
+      .live-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--surface-raised);
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .live-badge__dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--emerald);
+        animation: pulse-soft 2s ease-in-out infinite;
+      }
+
+      .live-badge__dot--waiting {
+        background: var(--amber);
+        animation: none;
+      }
+
+      @keyframes pulse-soft {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.45;
+        }
+      }
+
+      /* ── Cache sweep button ──────────────────────────────────── */
+      .btn-sweep {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 12px;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.18), rgba(34, 211, 238, 0.08));
+        color: #6ee7b7;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: border-color var(--transition), background var(--transition), opacity var(--transition);
+        box-shadow: 0 0 24px -4px var(--emerald-glow);
+      }
+
+      .btn-sweep:hover:not(:disabled) {
+        border-color: rgba(16, 185, 129, 0.6);
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.25), rgba(34, 211, 238, 0.12));
+      }
+
+      .btn-sweep:focus-visible {
+        outline: 2px solid rgba(16, 185, 129, 0.5);
+        outline-offset: 2px;
+      }
+
+      .btn-sweep:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-sweep__label {
+        display: inline;
+      }
+
+      .btn-sweep.loading .btn-sweep__icon {
+        animation: spin-sweep 0.9s linear infinite;
+      }
+
+      .btn-sweep:active:not(:disabled) .btn-sweep__icon {
+        animation: sweep-wiggle 0.55s ease-out;
+      }
+
+      @keyframes spin-sweep {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes sweep-wiggle {
+        0% {
+          transform: rotate(-8deg) scale(1);
+        }
+        50% {
+          transform: rotate(12deg) scale(1.08);
+        }
+        100% {
+          transform: rotate(0deg) scale(1);
+        }
+      }
+
+      /* ── Main content ──────────────────────────────────────────── */
+      .main {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 12px 0 14px;
+      }
+
+      .main__stack {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .section-gpu {
+        flex-shrink: 0;
+        width: 100%;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .section-head__title {
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+      }
+
+      .section-head__meta {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+
+      /* ── GPU grid (50/50, alineado con tabla de procesos) ─────── */
+      .gpu-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        align-items: stretch;
+        gap: 10px;
+        transform: translate3d(0, 0, 0);
+        will-change: transform, opacity;
+      }
+
+      @media (max-width: 720px) {
+        .gpu-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .gpu-card {
+        width: 100%;
+        min-width: 0;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: var(--surface-card);
+        padding: 12px 14px;
+        cursor: pointer;
+        transform: translate3d(0, 0, 0);
+        will-change: transform, opacity;
+        transition:
+          border-color var(--transition-fast),
+          box-shadow var(--transition-fast);
+      }
+
+      .gpu-card--integrated:hover {
+        border-color: rgba(16, 185, 129, 0.55);
+        box-shadow:
+          0 0 0 1px rgba(16, 185, 129, 0.2),
+          0 0 18px -6px var(--emerald-glow);
+      }
+
+      .gpu-card--dedicated:hover {
+        border-color: rgba(34, 211, 238, 0.55);
+        box-shadow:
+          0 0 0 1px rgba(34, 211, 238, 0.2),
+          0 0 18px -6px var(--cyan-glow);
+      }
+
+      .gpu-card__body {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        width: 100%;
+      }
+
+      .gpu-card__info {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+        padding-right: 8px;
+        text-align: left;
+      }
+
+      .gpu-card__label {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .gpu-card__label--emerald {
+        color: rgba(16, 185, 129, 0.85);
+      }
+
+      .gpu-card__label--cyan {
+        color: rgba(34, 211, 238, 0.85);
+      }
+
+      .gpu-card__name {
+        margin-top: 2px;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.25;
+        max-width: min(100%, 42ch);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      @media (min-width: 900px) {
+        .gpu-card__name {
+          max-width: min(100%, 56ch);
+        }
+      }
+
+      .gpu-card__name--dedicated {
+        display: block;
+        width: 100%;
+        min-width: 0;
+      }
+
+      .gpu-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+        max-width: 320px;
+      }
+
+      .gpu-stat {
+        padding: 4px 6px;
+        border-radius: 6px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(17, 22, 32, 0.8);
+        min-width: 0;
+      }
+
+      .gpu-stat__key {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted);
+      }
+
+      .gpu-stat__val {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .gpu-stat__val--small {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--text-muted);
+      }
+
+      .gpu-card__status {
+        margin-top: 4px;
+        font-size: 10px;
+        color: var(--text-dim);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* ── Metric tags (N/D, Asignada por Sistema) ──────────────── */
+      .metric-tag {
+        display: inline-block;
+        max-width: 100%;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-family: var(--font-sans);
+        font-size: 9px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        line-height: 1.4;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: middle;
+      }
+
+      .metric-tag--system {
+        color: rgba(16, 185, 129, 0.9);
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.22);
+      }
+
+      .metric-tag--na {
+        color: var(--text-muted);
+        background: rgba(100, 116, 139, 0.12);
+        border: 1px solid rgba(100, 116, 139, 0.2);
+      }
+
+      .metric-tag--muted {
+        color: var(--text-dim);
+        background: transparent;
+        border: 1px solid var(--border-subtle);
+        padding: 0 4px;
+      }
+
+      /* ── SVG ring gauges ───────────────────────────────────────── */
+      .ring-wrap {
+        position: relative;
+        flex: 0 0 auto;
+        margin-left: auto;
+        align-self: center;
+      }
+
+      .ring-svg {
+        display: block;
+        border-radius: 50%;
+      }
+
+      .ring-svg--emerald {
+        filter: drop-shadow(0 0 12px var(--emerald-glow));
+      }
+
+      .ring-svg--cyan {
+        filter: drop-shadow(0 0 12px var(--cyan-glow));
+      }
+
+      .ring-track {
+        stroke: var(--border);
+      }
+
+      .ring-progress {
+        transition: stroke-dashoffset 0.4s ease-in-out;
+      }
+
+      .ring-progress--emerald {
+        stroke: var(--emerald);
+        filter: drop-shadow(0 0 6px var(--emerald));
+      }
+
+      .ring-progress--cyan {
+        stroke: var(--cyan);
+        filter: drop-shadow(0 0 6px var(--cyan));
+      }
+
+      .ring-center__pct {
+        font-family: var(--font-mono);
+        font-size: 17px;
+        font-weight: 600;
+        fill: var(--text-secondary);
+      }
+
+      .ring-center__lbl {
+        font-family: var(--font-sans);
+        font-size: 8px;
+        fill: var(--text-muted);
+      }
+
+      /* ── Process table panel ───────────────────────────────────── */
+      .panel {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: var(--surface-card);
+        overflow: hidden;
+        transform: translate3d(0, 0, 0);
+        will-change: transform, opacity;
+      }
+
+      .panel__head {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(17, 22, 32, 0.5);
+      }
+
+      .panel__title {
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .panel__subtitle {
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 1px;
+      }
+
+      .panel__tools {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+      }
+
+      @media (min-width: 640px) {
+        .panel__tools {
+          width: auto;
+        }
+      }
+
+      .input-search {
+        flex: 1;
+        min-width: 0;
+        padding: 5px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-family: inherit;
+        transition: border-color var(--transition), box-shadow var(--transition);
+      }
+
+      @media (min-width: 640px) {
+        .input-search {
+          width: 200px;
+          flex: none;
+        }
+      }
+
+      .input-search::placeholder {
+        color: var(--text-muted);
+      }
+
+      .input-search:focus {
+        outline: none;
+        border-color: rgba(16, 185, 129, 0.5);
+        box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4);
+      }
+
+      .badge-count {
+        flex-shrink: 0;
+        padding: 5px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .table-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+      }
+
+      .table-wrapper {
+        height: 360px;
+        flex-shrink: 0;
+        overflow: auto;
+        overflow-anchor: auto;
+        transform: translate3d(0, 0, 0);
+        will-change: transform, opacity;
+      }
+
+      .table-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      .table-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .table-scroll::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 999px;
+      }
+
+      .proc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        line-height: 1.3;
+        text-align: left;
+      }
+
+      .proc-table thead {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--surface-raised);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .proc-table th {
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+        transition: color var(--transition-fast);
+      }
+
+      .proc-table th:hover {
+        color: var(--emerald);
+      }
+
+      .proc-table th.col-num {
+        text-align: right;
+      }
+
+      .sort-indicator {
+        margin-left: 4px;
+        color: var(--emerald);
+      }
+
+      .sort-indicator--hidden {
+        opacity: 0;
+      }
+
+      .proc-table td {
+        padding: 4px 10px;
+        border-bottom: 1px solid rgba(30, 39, 56, 0.55);
+      }
+
+      .proc-table tbody tr {
+        cursor: pointer;
+        border-left: 2px solid transparent;
+        transition:
+          background var(--transition-fast),
+          border-color var(--transition-fast),
+          box-shadow var(--transition-fast);
+      }
+
+      .proc-table tbody tr:hover {
+        background: rgba(17, 22, 32, 0.75);
+        border-left-color: var(--emerald);
+        box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.12);
+      }
+
+      .proc-table tbody tr.row-top {
+        background: rgba(16, 185, 129, 0.05);
+        border-left-color: var(--emerald);
+      }
+
+      .proc-table tbody tr.row-top:hover {
+        border-left-color: var(--emerald);
+        box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.2);
+      }
+
+      .proc-table tbody tr.row-enter {
+        animation: row-fade 0.25s ease-out;
+      }
+
+      @keyframes row-fade {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .cell-mono {
+        font-family: var(--font-mono);
+        color: var(--text-secondary);
+      }
+
+      .cell-name {
+        font-weight: 500;
+        max-width: 220px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .cell-num {
+        text-align: right;
+      }
+
+      .cpu-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        justify-content: flex-end;
+        min-width: 76px;
+      }
+
+      .cpu-bar {
+        display: block;
+        width: 52px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--border);
+        overflow: hidden;
+      }
+
+      .cpu-bar__fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .cpu-bar__fill--low {
+        background: #475569;
+      }
+
+      .cpu-bar__fill--mid {
+        background: var(--emerald);
+      }
+
+      .cpu-bar__fill--high {
+        background: var(--amber);
+      }
+
+      .cpu-bar__fill--crit {
+        background: var(--rose);
+      }
+
+      .proc-table th.col-vram,
+      .proc-table td.cell-vram {
+        width: 20%;
+      }
+
+      .cell-vram {
+        font-family: var(--font-mono);
+        color: rgba(34, 211, 238, 0.9);
+      }
+
+      .cell-vram--zero {
+        color: var(--text-dim);
+        opacity: 0.55;
+      }
+
+      .cell-empty {
+        padding: 24px 12px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* ── Toast ─────────────────────────────────────────────────── */
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 50;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(16px);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+
+      .toast--visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .toast__inner {
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: var(--surface-raised);
+        font-size: 13px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      .toast__message {
+        color: var(--text-secondary);
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="app">
+      <!-- AppShell / Header -->
+      <header class="header">
+        <div class="container header__inner">
+          <div class="brand">
+            <div class="brand__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 2L4 7v10l8 5 8-5V7l-8-5z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                />
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </div>
+            <div class="brand__text">
+              <h1 class="brand__title">NeuroMonitor</h1>
+              <p id="hostname" class="brand__host">—</p>
+            </div>
+          </div>
+
+          <div class="header__actions">
+            <div id="live-badge" class="live-badge">
+              <span id="live-dot" class="live-badge__dot live-badge__dot--waiting"></span>
+              <span id="last-update">Esperando pywebview…</span>
+            </div>
+
+            <!-- CacheSweepButton -->
+            <button id="btn-sweep-cache" type="button" class="btn-sweep" title="Limpiar caché del sistema">
+              <span class="btn-sweep__icon" aria-hidden="true">🧹</span>
+              <span class="btn-sweep__label">Limpiar caché</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="main">
+        <div class="container main__stack">
+          <!-- GpuRingPanel -->
+          <section class="section-gpu" aria-label="Uso de GPU">
+            <div class="section-head">
+              <h2 class="section-head__title">GPUs en paralelo</h2>
+              <span id="gpu-timestamp" class="section-head__meta">—</span>
+            </div>
+
+            <div class="gpu-grid">
+              <!-- GpuRing: iGPU -->
+              <article id="gpu-integrated-card" class="gpu-card gpu-card--integrated">
+                <div class="gpu-card__body">
+                  <div class="gpu-card__info">
+                    <p class="gpu-card__label gpu-card__label--emerald">GPU Integrada</p>
+                    <h3 id="integrated-name" class="gpu-card__name" title="">Detectando…</h3>
+                    <dl class="gpu-stats">
+                      <div class="gpu-stat">
+                        <dt class="gpu-stat__key">VRAM</dt>
+                        <dd id="integrated-vram" class="gpu-stat__val"><span class="metric-tag metric-tag--muted">…</span></dd>
+                      </div>
+                      <div class="gpu-stat">
+                        <dt class="gpu-stat__key">Fuente</dt>
+                        <dd id="integrated-source" class="gpu-stat__val gpu-stat__val--small"><span class="metric-tag metric-tag--muted">…</span></dd>
+                      </div>
+                    </dl>
+                    <p id="integrated-status" class="gpu-card__status"></p>
+                  </div>
+                  <div id="ring-integrated" class="ring-wrap" aria-hidden="true"></div>
+                </div>
+              </article>
+
+              <!-- GpuRing: dGPU -->
+              <article id="gpu-dedicated-card" class="gpu-card gpu-card--dedicated">
+                <div class="gpu-card__body">
+                  <div class="gpu-card__info">
+                    <p class="gpu-card__label gpu-card__label--cyan">GPU Dedicada</p>
+                    <h3 id="dedicated-name" class="gpu-card__name gpu-card__name--dedicated" title="">Detectando…</h3>
+                    <dl class="gpu-stats">
+                      <div class="gpu-stat">
+                        <dt class="gpu-stat__key">VRAM</dt>
+                        <dd id="dedicated-vram" class="gpu-stat__val"><span class="metric-tag metric-tag--muted">…</span></dd>
+                      </div>
+                      <div class="gpu-stat">
+                        <dt class="gpu-stat__key">Temperatura</dt>
+                        <dd id="dedicated-temp" class="gpu-stat__val"><span class="metric-tag metric-tag--muted">…</span></dd>
+                      </div>
+                    </dl>
+                    <p id="dedicated-status" class="gpu-card__status"></p>
+                  </div>
+                  <div id="ring-dedicated" class="ring-wrap" aria-hidden="true"></div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <!-- ProcessTable -->
+          <section aria-label="Procesos activos" class="panel">
+            <div class="panel__head">
+              <div>
+                <h2 class="panel__title">Procesos activos</h2>
+                <p class="panel__subtitle">Top 20 por consumo · orden estable entre ticks</p>
+              </div>
+              <div class="panel__tools">
+                <label class="sr-only" for="process-filter">Filtrar procesos</label>
+                <input
+                  id="process-filter"
+                  type="search"
+                  class="input-search"
+                  placeholder="Buscar por nombre o PID…"
+                />
+                <span id="process-count" class="badge-count">0</span>
+              </div>
+            </div>
+
+            <div class="table-scroll table-wrapper">
+              <table class="proc-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-sort="pid" class="sortable">
+                      PID <span class="sort-indicator sort-indicator--hidden"></span>
+                    </th>
+                    <th scope="col" data-sort="name" class="sortable">
+                      Nombre <span class="sort-indicator sort-indicator--hidden"></span>
+                    </th>
+                    <th scope="col" data-sort="cpu_percent" class="sortable col-num">
+                      % CPU <span class="sort-indicator">▼</span>
+                    </th>
+                    <th scope="col" data-sort="memory_rss_mb" class="sortable col-num">
+                      RAM <span class="sort-indicator sort-indicator--hidden"></span>
+                    </th>
+                    <th scope="col" data-sort="vram_mb" class="sortable col-num col-vram">
+                      VRAM Dedicada <span class="sort-indicator sort-indicator--hidden"></span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="process-tbody">
+                  <tr data-empty="1">
+                    <td colspan="5" class="cell-empty">Esperando bridge pywebview…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- Toast -->
+      <div id="toast" class="toast" role="status" aria-live="polite">
+        <div class="toast__inner">
+          <span id="toast-icon"></span>
+          <span id="toast-message" class="toast__message"></span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function NeuroMonitorDashboard() {
+        "use strict";
+
+        const POLL_MS = 1500;
+        const RING_SIZE = 96;
+        const RING_STROKE = 7;
+        const TABLE_ROW_LIMIT = 20;
+        const TOP_REORDER_SLOTS = 5;
+
+        const state = {
+          sortKey: "cpu_percent",
+          sortDir: "desc",
+          filter: "",
+          processes: [],
+          polling: null,
+          toastTimer: null,
+          bridgeReady: false,
+          rings: {},
+          frozenPids: [],
+          top5Pids: [],
+          forceResort: false,
+        };
+
+        const $ = (sel) => document.querySelector(sel);
+        const $$ = (sel) => document.querySelectorAll(sel);
+
+        /* ── pywebview bridge ─────────────────────────────────────── */
+        function hasBridge() {
+          return typeof window.pywebview !== "undefined" && window.pywebview?.api;
+        }
+
+        async function fetchMetrics() {
+          if (!hasBridge()) return null;
+          const fn = window.pywebview.api.get_gpu_and_processes;
+          if (typeof fn !== "function") return null;
+          const data = await fn();
+          return data ? normalizeProbePayload(data) : null;
+        }
+
+        async function sweepSystemCache() {
+          if (!hasBridge()) return null;
+          const fn = window.pywebview.api.clear_system_cache;
+          if (typeof fn !== "function") return null;
+          const result = await fn();
+          if (result && result.success === false) {
+            throw new Error(result.error || result.message || "Error al limpiar caché");
+          }
+          return result ?? { success: true, message: "Caché del sistema liberada" };
+        }
+
+        /* ── normalización de datos ───────────────────────────────── */
+        function normalizeProbePayload(data) {
+          return {
+            hostname: data.hostname || "localhost",
+            collectedAt: data.collected_at,
+            integrated: data.integrated_gpu || {},
+            dedicated: normalizeDedicated(data.dedicated_gpu || {}),
+            processes: (data.processes || []).map(normalizeProcess),
+          };
+        }
+
+        function normalizeDedicated(dedicated) {
+          const devices = dedicated.devices || [];
+          const primary = devices[0] || {};
+          return {
+            available: dedicated.available ?? devices.length > 0,
+            name: primary.name || dedicated.name || "GPU Dedicada",
+            utilization_percent: primary.utilization_percent,
+            memory_used_mib: primary.memory_used_mib,
+            memory_total_mib: primary.memory_total_mib,
+            memory_percent:
+              primary.memory_percent ??
+              pctFromParts(primary.memory_used_mib, primary.memory_total_mib),
+            temperature_c: primary.temperature_c,
+            error: dedicated.error,
+            devices,
+          };
+        }
+
+        function normalizeProcess(p) {
+          return {
+            pid: Number(p.pid) || 0,
+            name: String(p.name || "—"),
+            cpu_percent: Number(p.cpu_percent) || 0,
+            memory_rss_mb: Number(p.memory_rss_mb ?? p.ram_mb ?? 0),
+            vram_mb: p.vram_mb != null ? Number(p.vram_mb) : null,
+          };
+        }
+
+        /* ── utilidades ───────────────────────────────────────────── */
+        function bytesToMib(bytes) {
+          if (bytes == null) return null;
+          return Math.round((bytes / (1024 * 1024)) * 10) / 10;
+        }
+
+        function pctFromParts(used, total) {
+          if (used == null || !total) return null;
+          return Math.round((used / total) * 1000) / 10;
+        }
+
+        function clampPct(value) {
+          if (value == null || Number.isNaN(value)) return 0;
+          return Math.max(0, Math.min(100, value));
+        }
+
+        function formatPct(value) {
+          if (value == null) return null;
+          return `${clampPct(value).toFixed(1)}%`;
+        }
+
+        function formatMb(value) {
+          if (value == null) return null;
+          return `${Number(value).toFixed(1)} MB`;
+        }
+
+        function metricTag(label, variant = "na") {
+          return `<span class="metric-tag metric-tag--${variant}">${label}</span>`;
+        }
+
+        function formatVramHtml(integrated) {
+          if (integrated.memory_used_bytes != null && integrated.memory_total_bytes) {
+            const used = bytesToMib(integrated.memory_used_bytes);
+            const total = bytesToMib(integrated.memory_total_bytes);
+            return `${used} / ${total} MB`;
+          }
+          if (integrated.memory_percent != null) return formatPct(integrated.memory_percent);
+          if (integrated.available) {
+            return metricTag("Asignada por Sistema", "system");
+          }
+          return metricTag("N/D", "na");
+        }
+
+        function formatDedicatedVramHtml(d) {
+          if (d.memory_used_mib != null && d.memory_total_mib) {
+            return `${d.memory_used_mib} / ${d.memory_total_mib} MB`;
+          }
+          if (d.memory_percent != null) return formatPct(d.memory_percent);
+          if (d.available) return metricTag("N/D", "na");
+          return metricTag("N/D", "na");
+        }
+
+        function formatTempHtml(temp, available) {
+          if (temp != null) return `${temp} °C`;
+          if (available) return metricTag("N/D", "na");
+          return metricTag("N/D", "na");
+        }
+
+        function formatSourceHtml(source, available) {
+          if (source) return source;
+          if (available) return metricTag("Sistema", "muted");
+          return metricTag("N/D", "na");
+        }
+
+        function formatProcessVramText(vramMb) {
+          const mb = vramMb != null && !Number.isNaN(vramMb) ? Number(vramMb) : 0;
+          return `${mb.toFixed(1)} MB`;
+        }
+
+        function applyVramCellStyle(el, vramMb) {
+          const mb = vramMb != null && !Number.isNaN(vramMb) ? Number(vramMb) : 0;
+          el.classList.toggle("cell-vram--zero", mb <= 0);
+        }
+
+        function formatTime(isoOrEpoch) {
+          if (!isoOrEpoch) return "—";
+          const date =
+            typeof isoOrEpoch === "number"
+              ? new Date(isoOrEpoch * 1000)
+              : new Date(isoOrEpoch);
+          if (Number.isNaN(date.getTime())) return "—";
+          return date.toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+        }
+
+        function consumptionScore(p) {
+          return p.cpu_percent * 2 + p.memory_rss_mb * 0.05 + (p.vram_mb || 0) * 0.08;
+        }
+
+        function getTop5Pids(processes) {
+          return [...processes]
+            .sort((a, b) => consumptionScore(b) - consumptionScore(a))
+            .slice(0, TOP_REORDER_SLOTS)
+            .map((p) => p.pid);
+        }
+
+        function top5MembershipChanged(nextTop5) {
+          const prev = state.top5Pids;
+          if (prev.length !== nextTop5.length) return true;
+          const prevSet = new Set(prev);
+          return nextTop5.some((pid) => !prevSet.has(pid));
+        }
+
+        function shouldFullResort() {
+          const nextTop5 = getTop5Pids(state.processes);
+          if (state.forceResort) {
+            state.forceResort = false;
+            state.top5Pids = nextTop5;
+            return true;
+          }
+          if (top5MembershipChanged(nextTop5)) {
+            state.top5Pids = nextTop5;
+            return true;
+          }
+          if (!state.frozenPids.length) {
+            state.top5Pids = nextTop5;
+            return true;
+          }
+          return false;
+        }
+
+        /* ── GpuRing: SVG nativo con stroke-dashoffset ────────────── */
+        function ringGeometry() {
+          const radius = (RING_SIZE - RING_STROKE) / 2;
+          const circumference = 2 * Math.PI * radius;
+          return { radius, circumference };
+        }
+
+        function mountRing(containerId, accent) {
+          const container = document.getElementById(containerId);
+          if (!container) return null;
+
+          const { radius, circumference } = ringGeometry();
+          const accentClass = accent === "cyan" ? "cyan" : "emerald";
+          const svgClass = accentClass === "cyan" ? "ring-svg--cyan" : "ring-svg--emerald";
+
+          container.innerHTML = `
+            <svg
+              class="ring-svg ${svgClass}"
+              width="${RING_SIZE}"
+              height="${RING_SIZE}"
+              viewBox="0 0 ${RING_SIZE} ${RING_SIZE}"
+              role="img"
+              aria-label="Medidor de utilización GPU"
+            >
+              <circle
+                class="ring-track"
+                cx="${RING_SIZE / 2}"
+                cy="${RING_SIZE / 2}"
+                r="${radius}"
+                fill="none"
+                stroke-width="${RING_STROKE}"
+              />
+              <circle
+                class="ring-progress ring-progress--${accentClass}"
+                data-ring-progress
+                cx="${RING_SIZE / 2}"
+                cy="${RING_SIZE / 2}"
+                r="${radius}"
+                fill="none"
+                stroke-width="${RING_STROKE}"
+                stroke-linecap="round"
+                stroke-dasharray="${circumference}"
+                stroke-dashoffset="${circumference}"
+                transform="rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})"
+              />
+              <text
+                class="ring-center__pct"
+                data-ring-pct
+                x="50%"
+                y="46%"
+                text-anchor="middle"
+              >0%</text>
+              <text
+                class="ring-center__lbl"
+                x="50%"
+                y="62%"
+                text-anchor="middle"
+              >Utilización</text>
+            </svg>
+          `;
+
+          return {
+            progress: container.querySelector("[data-ring-progress]"),
+            pctLabel: container.querySelector("[data-ring-pct]"),
+            svg: container.querySelector(".ring-svg"),
+            circumference,
+            lastPct: null,
+          };
+        }
+
+        function setRing(ringState, percent) {
+          if (!ringState) return;
+          const value = clampPct(percent);
+          const rounded = Math.round(value * 10) / 10;
+
+          if (ringState.lastPct !== rounded) {
+            const offset = ringState.circumference - (rounded / 100) * ringState.circumference;
+            ringState.progress.setAttribute("stroke-dashoffset", String(offset));
+            ringState.lastPct = rounded;
+          }
+
+          const label = `${Math.round(rounded)}%`;
+          if (ringState.pctLabel.textContent !== label) {
+            ringState.pctLabel.textContent = label;
+          }
+          const aria = `Utilización: ${rounded.toFixed(1)}%`;
+          if (ringState.svg.getAttribute("aria-label") !== aria) {
+            ringState.svg.setAttribute("aria-label", aria);
+          }
+        }
+
+        function updateGpuCards(data) {
+          const { integrated, dedicated } = data;
+
+          setRing(
+            state.rings.integrated,
+            integrated.utilization_percent ?? integrated.memory_percent
+          );
+          setRing(
+            state.rings.dedicated,
+            dedicated.utilization_percent ?? dedicated.memory_percent
+          );
+
+          $("#integrated-name").textContent = integrated.available
+            ? integrated.name || "GPU Integrada"
+            : "No detectada";
+          $("#integrated-name").title = integrated.available
+            ? integrated.name || "GPU Integrada"
+            : "";
+          $("#integrated-vram").innerHTML = integrated.available
+            ? formatVramHtml(integrated)
+            : metricTag("N/D", "na");
+          $("#integrated-source").innerHTML = formatSourceHtml(
+            integrated.source,
+            integrated.available
+          );
+          $("#integrated-status").textContent = integrated.error
+            ? integrated.error
+            : integrated.available
+              ? "Telemetría activa"
+              : "Sin señal de iGPU";
+
+          const dedicatedNameEl = $("#dedicated-name");
+          dedicatedNameEl.textContent = dedicated.available
+            ? dedicated.name || "GPU Dedicada"
+            : "No detectada";
+          dedicatedNameEl.title = dedicated.available ? dedicated.name || "" : "";
+
+          $("#dedicated-vram").innerHTML = dedicated.available
+            ? formatDedicatedVramHtml(dedicated)
+            : metricTag("N/D", "na");
+          $("#dedicated-temp").innerHTML = formatTempHtml(
+            dedicated.temperature_c,
+            dedicated.available
+          );
+          $("#dedicated-status").textContent = dedicated.error
+            ? dedicated.error
+            : dedicated.available
+              ? "Telemetría activa"
+              : "Sin GPU dedicada (NVIDIA)";
+
+          $("#gpu-timestamp").textContent = `Actualizado ${formatTime(data.collectedAt)}`;
+        }
+
+        /* ── ProcessTable ─────────────────────────────────────────── */
+        function getSortedProcesses() {
+          const key = state.sortKey;
+          const dir = state.sortDir === "asc" ? 1 : -1;
+          const filtered = state.processes.filter((p) => {
+            if (!state.filter) return true;
+            const q = state.filter.toLowerCase();
+            return p.name.toLowerCase().includes(q) || String(p.pid).includes(q);
+          });
+
+          filtered.sort((a, b) => {
+            let av = a[key];
+            let bv = b[key];
+            if (key === "name") {
+              av = (av || "").toLowerCase();
+              bv = (bv || "").toLowerCase();
+              if (av < bv) return -1 * dir;
+              if (av > bv) return 1 * dir;
+              return 0;
+            }
+            if (av == null) av = -1;
+            if (bv == null) bv = -1;
+            return (av - bv) * dir;
+          });
+
+          if (state.sortKey === "cpu_percent" && state.sortDir === "desc" && !state.filter) {
+            filtered.sort((a, b) => consumptionScore(b) - consumptionScore(a));
+          }
+
+          return filtered;
+        }
+
+        function cpuBarClass(pct) {
+          if (pct >= 15) return "cpu-bar__fill--crit";
+          if (pct >= 8) return "cpu-bar__fill--high";
+          if (pct >= 3) return "cpu-bar__fill--mid";
+          return "cpu-bar__fill--low";
+        }
+
+        function createProcessRow(p, isTop, animate) {
+          const tr = document.createElement("tr");
+          tr.id = `proc-${p.pid}`;
+          tr.dataset.pid = String(p.pid);
+          if (isTop) tr.classList.add("row-top");
+          if (animate) tr.classList.add("row-enter");
+
+          const tdPid = document.createElement("td");
+          tdPid.className = "cell-mono";
+          tdPid.textContent = String(p.pid);
+
+          const tdName = document.createElement("td");
+          tdName.className = "cell-name";
+          tdName.title = p.name;
+          tdName.textContent = p.name;
+
+          const tdCpu = document.createElement("td");
+          tdCpu.className = "cell-num";
+          const cpuCell = document.createElement("div");
+          cpuCell.className = "cpu-cell";
+          const cpuBar = document.createElement("div");
+          cpuBar.className = "cpu-bar";
+          const cpuFill = document.createElement("div");
+          cpuFill.className = `cpu-bar__fill ${cpuBarClass(p.cpu_percent)}`;
+          cpuFill.style.width = `${clampPct(p.cpu_percent)}%`;
+          cpuBar.appendChild(cpuFill);
+          const cpuPct = document.createElement("span");
+          cpuPct.className = "cell-mono cell-cpu";
+          cpuPct.textContent = `${p.cpu_percent.toFixed(1)}%`;
+          cpuCell.appendChild(cpuBar);
+          cpuCell.appendChild(cpuPct);
+          tdCpu.appendChild(cpuCell);
+
+          const tdRam = document.createElement("td");
+          tdRam.className = "cell-num cell-mono cell-ram";
+          tdRam.textContent = formatMb(p.memory_rss_mb) ?? "N/D";
+
+          const tdVram = document.createElement("td");
+          tdVram.className = "cell-num cell-vram";
+          tdVram.textContent = formatProcessVramText(p.vram_mb);
+          applyVramCellStyle(tdVram, p.vram_mb);
+
+          tr.append(tdPid, tdName, tdCpu, tdRam, tdVram);
+          return tr;
+        }
+
+        function updateProcessRowCells(tr, p, isTop) {
+          tr.classList.toggle("row-top", isTop);
+
+          const cpuFill = tr.querySelector(".cpu-bar__fill");
+          if (cpuFill) {
+            const nextClass = `cpu-bar__fill ${cpuBarClass(p.cpu_percent)}`;
+            if (cpuFill.className !== nextClass) cpuFill.className = nextClass;
+            const nextWidth = `${clampPct(p.cpu_percent)}%`;
+            if (cpuFill.style.width !== nextWidth) cpuFill.style.width = nextWidth;
+          }
+
+          const cpuEl = tr.querySelector(".cell-cpu");
+          if (cpuEl) {
+            const nextPct = `${p.cpu_percent.toFixed(1)}%`;
+            if (cpuEl.textContent !== nextPct) cpuEl.textContent = nextPct;
+          }
+
+          const ramEl = tr.querySelector(".cell-ram");
+          if (ramEl) {
+            const nextRam = formatMb(p.memory_rss_mb) ?? "N/D";
+            if (ramEl.textContent !== nextRam) ramEl.textContent = nextRam;
+          }
+
+          const vramEl = tr.querySelector(".cell-vram");
+          if (vramEl) {
+            const nextVram = formatProcessVramText(p.vram_mb);
+            if (vramEl.textContent !== nextVram) vramEl.textContent = nextVram;
+            applyVramCellStyle(vramEl, p.vram_mb);
+          }
+        }
+
+        function showEmptyTableMessage(tbody, message) {
+          tbody.querySelectorAll("tr[data-pid]").forEach((tr) => tr.remove());
+          let emptyRow = tbody.querySelector("tr[data-empty]");
+          if (!emptyRow) {
+            emptyRow = document.createElement("tr");
+            emptyRow.dataset.empty = "1";
+            const td = document.createElement("td");
+            td.colSpan = 5;
+            td.className = "cell-empty";
+            emptyRow.appendChild(td);
+            tbody.appendChild(emptyRow);
+          }
+          emptyRow.firstElementChild.textContent = message;
+        }
+
+        function renderDesktopData() {
+          const sorted = getSortedProcesses();
+          const displayRows = sorted.slice(0, TABLE_ROW_LIMIT);
+          const tbody = $("#process-tbody");
+          const total = sorted.length;
+          $("#process-count").textContent =
+            total > TABLE_ROW_LIMIT ? `${displayRows.length}/${total}` : String(total);
+
+          if (!displayRows.length) {
+            state.frozenPids = [];
+            showEmptyTableMessage(
+              tbody,
+              state.filter ? "Sin coincidencias para el filtro." : "No hay procesos activos."
+            );
+            return;
+          }
+
+          const emptyRow = tbody.querySelector("tr[data-empty]");
+          if (emptyRow) emptyRow.remove();
+
+          const displayByPid = new Map(displayRows.map((p) => [p.pid, p]));
+          const topScore = consumptionScore(displayRows[0]);
+          const fullResort = shouldFullResort();
+
+          if (fullResort) {
+            state.frozenPids = displayRows.map((p) => p.pid);
+          } else {
+            state.frozenPids = state.frozenPids.filter((pid) => displayByPid.has(pid));
+          }
+
+          state.frozenPids.forEach((pid, i) => {
+            const p = displayByPid.get(pid);
+            if (!p) {
+              document.getElementById(`proc-${pid}`)?.remove();
+              return;
+            }
+
+            const isTop = i === 0 && consumptionScore(p) === topScore && topScore > 0;
+            let tr = document.getElementById(`proc-${pid}`);
+
+            if (tr) {
+              updateProcessRowCells(tr, p, isTop);
+            } else if (fullResort) {
+              tr = createProcessRow(p, isTop, true);
+              tbody.appendChild(tr);
+            }
+
+            if (fullResort && tr) {
+              tbody.appendChild(tr);
+            }
+          });
+
+          const visibleSet = new Set(state.frozenPids);
+          tbody.querySelectorAll("tr[data-pid]").forEach((tr) => {
+            const pid = Number(tr.dataset.pid);
+            if (!visibleSet.has(pid)) tr.remove();
+          });
+        }
+
+        function updateSortIndicators() {
+          $$(".sortable").forEach((th) => {
+            const key = th.dataset.sort;
+            const indicator = th.querySelector(".sort-indicator");
+            if (!indicator) return;
+            if (key === state.sortKey) {
+              indicator.textContent = state.sortDir === "asc" ? "▲" : "▼";
+              indicator.classList.remove("sort-indicator--hidden");
+            } else {
+              indicator.textContent = "";
+              indicator.classList.add("sort-indicator--hidden");
+            }
+          });
+        }
+
+        /* ── Toast ────────────────────────────────────────────────── */
+        function showToast(message, type = "info") {
+          const toast = $("#toast");
+          const icon = type === "success" ? "✓" : type === "error" ? "✕" : "ℹ";
+          $("#toast-icon").textContent = icon;
+          $("#toast-message").textContent = message;
+          toast.classList.add("toast--visible");
+          clearTimeout(state.toastTimer);
+          state.toastTimer = setTimeout(() => {
+            toast.classList.remove("toast--visible");
+          }, 3200);
+        }
+
+        /* ── Polling loop (1.5 s) ─────────────────────────────────── */
+        async function tick() {
+          try {
+            const data = await fetchMetrics();
+            if (!data) return;
+
+            $("#hostname").textContent = data.hostname;
+            $("#last-update").textContent = `Actualizado ${formatTime(data.collectedAt)}`;
+            updateGpuCards(data);
+            state.processes = data.processes;
+            renderDesktopData();
+          } catch (err) {
+            console.error("[NeuroMonitor]", err);
+            showToast("Error al obtener métricas", "error");
+          }
+        }
+
+        function startPolling() {
+          if (state.polling) return;
+          tick();
+          state.polling = setInterval(tick, POLL_MS);
+        }
+
+        function markBridgeLive() {
+          state.bridgeReady = true;
+          const dot = $("#live-dot");
+          dot.classList.remove("live-badge__dot--waiting");
+        }
+
+        /* ── Event bindings ───────────────────────────────────────── */
+        function bindEvents() {
+          $("#process-filter").addEventListener("input", (e) => {
+            state.filter = e.target.value.trim();
+            state.forceResort = true;
+            state.frozenPids = [];
+            renderDesktopData();
+          });
+
+          $$(".sortable").forEach((th) => {
+            th.addEventListener("click", () => {
+              const key = th.dataset.sort;
+              if (state.sortKey === key) {
+                state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+              } else {
+                state.sortKey = key;
+                state.sortDir = key === "name" ? "asc" : "desc";
+              }
+              state.forceResort = true;
+              state.frozenPids = [];
+              updateSortIndicators();
+              renderDesktopData();
+            });
+          });
+
+          $("#btn-sweep-cache").addEventListener("click", async () => {
+            const btn = $("#btn-sweep-cache");
+            if (btn.disabled || !state.bridgeReady) return;
+            btn.disabled = true;
+            btn.classList.add("loading");
+
+            try {
+              const res = await sweepSystemCache();
+              showToast(res?.message || "Caché del sistema liberada", "success");
+              await tick();
+            } catch (err) {
+              showToast(err.message || "No se pudo limpiar la caché", "error");
+            } finally {
+              btn.disabled = false;
+              btn.classList.remove("loading");
+            }
+          });
+
+          window.addEventListener("pywebviewready", () => {
+            markBridgeLive();
+            showToast("Bridge pywebview conectado", "success");
+            startPolling();
+          });
+        }
+
+        /* ── Init ─────────────────────────────────────────────────── */
+        function init() {
+          state.rings.integrated = mountRing("ring-integrated", "emerald");
+          state.rings.dedicated = mountRing("ring-dedicated", "cyan");
+          bindEvents();
+          updateSortIndicators();
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", init);
+        } else {
+          init();
+        }
+      })();
+    </script>
   </body>
 </html>

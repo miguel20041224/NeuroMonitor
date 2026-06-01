@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import socket
 from typing import Any
 
 from pydantic import ValidationError
@@ -11,6 +12,8 @@ from neuromonitor.application.app import NeuroMonitorApplication
 from neuromonitor.config.settings import Settings
 from neuromonitor.models.snapshot import SystemSnapshot
 from neuromonitor.services.history_buffer import HistoryBuffer
+from neuromonitor.telemetry.cache import clear_system_cache as _clear_system_cache
+from neuromonitor.telemetry.engine import TelemetryEngine
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +38,36 @@ class NeuroMonitorBridge:
         self,
         app: NeuroMonitorApplication,
         history: HistoryBuffer,
+        telemetry: TelemetryEngine | None = None,
     ) -> None:
         self._app = app
         self._history = history
+        self._telemetry = telemetry or TelemetryEngine(run_discovery=False)
+
+    def get_gpu_and_processes(self) -> dict[str, Any]:
+        """Snapshot unificado: RAM, discos, iGPU, dGPU y procesos."""
+        try:
+            return self._telemetry.get_snapshot_dict()
+        except Exception:
+            logger.exception("Error capturando telemetría unificada")
+            return {
+                "hostname": socket.gethostname(),
+                "collected_at": 0,
+                "memory": {
+                    "total_gb": 0,
+                    "available_gb": 0,
+                    "used_gb": 0,
+                    "percent": 0,
+                },
+                "disks": [],
+                "integrated_gpu": {"available": False, "name": None, "utilization_percent": None},
+                "dedicated_gpu": {"available": False, "devices": [], "error": "ERR_INTERNAL"},
+                "processes": [],
+            }
+
+    def clear_system_cache(self) -> dict[str, Any]:
+        """Libera caché del kernel Linux (requiere permisos elevados)."""
+        return _clear_system_cache()
 
     def get_current_snapshot(self) -> dict[str, Any]:
         """Última muestra conocida; si el historial está vacío, captura una en caliente."""
